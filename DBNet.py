@@ -3,8 +3,8 @@ import cv2
 import torch
 
 class DBNet: # 文字分割类
-    def __init__(self,args):
-        pass
+    def __init__(self,experiment,args):
+        self.experiment = experiment
     def load_image(self,image_path):
         pass
     def resize_image(self,image_path):
