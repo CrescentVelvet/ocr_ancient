@@ -1,6 +1,7 @@
 # 统计学习理论导论大实验,古籍竖排汉字识别
 # conda activate ngp-wyf
 # pip install cnocr
+# pip install cnocr -i https://pypi.doubanio.com/simple
 # fc-list :lang=zh
 # apt-get install libfreetype6-dev libharfbuzz-dev libfribidi-dev meson gtk-doc-tools
 # pip install zhconv
@@ -20,7 +21,7 @@ def imgDrawRect(img,in1,in2,color,size,type): # 图像绘制方框函数
     else:
         print('error in DrawRect type')
     return draw
-def imgAddText(img,text,pos,color,size): # 图像绘制中文函数
+def imgAddText(img,text,pos,color,size): # 图像绘制竖排中文函数
     if isinstance(img,np.ndarray): # 判断是否OpenCV图像格式
         img = Image.fromarray(cv2.cvtColor(img,cv2.COLOR_BGR2RGB)) # OpenCV转PIL
     else:
@@ -46,25 +47,46 @@ def drawImg(out,pic_name): # 绘制单张图像的识别结果
 def fan2jian(fan): # 繁体转简体函数
     jian = zhconv.convert(fan,'zh-cn')
     return jian
-data_path = './DATA/'
-pic_path = 'phase1_text_img'
-json_name = 'result.json'
-pic_name = [] # 图像文件名列表
-all_dict = [] # 识别结果字典列表
-for home,dirs,files in os.walk(data_path+pic_path): # 遍历全部图像文件
-    for filename in files:
-        pic_name.append(os.path.join(home,filename)) # 保存全部图像文件名
-for i in range(len(pic_name)):
-    print(f'读取中---第{i}个图像',pic_name[i])
-    one_dict = {'id':pic_name[i],'text':''}
+def percentBar(num): # 显示当前百分比进度条函数
+    percent = int(100*i/num) # 显示当前百分比进度条
+    print('\r'+'▇'*(percent//2)+str(percent)+'%',end='')
+if False: # 识别单张图像
+    data_path = './DATA/'
+    pic_path = 'phase1_text_img'
+    pic_name = [] # 图像文件名列表
+    pic_name.append(data_path+pic_path+'401206800-J0001-3-000448-001-00002.jpg')
     ocr = CnOcr(rec_model_name='ch_PP-OCRv3') # 竖排汉字识别
-    out = ocr.ocr(pic_name[i])
-    for i in range(len(out)):
-        one_dict['text'] += fan2jian(fan=out[i]['text']) # 繁体转简体添加字典
-    print(f'结果为---',one_dict)
-    if False: # 绘制单张图像的识别结果
-        drawImg(out=out,pic_name=pic_name[i])
-    all_dict.append(one_dict)
-with open(data_path+json_name,'w') as result_json:
-    json.dump(all_dict,result_json,indent=4,ensure_ascii=False)
+    out = ocr.ocr(pic_name[0])
+    drawImg(out=out,pic_name=pic_name[0]) # 绘制单张图像的识别结果
+else: # 识别全部图像
+    data_path = './OUTPUT/'
+    json_path = './DATA/'
+    pic_path = 'phase1_test_img'
+    json_name = 'result.json'
+    pic_name = [] # 图像文件名列表
+    all_dict = [] # 全部图像识别结果的字典列表
+    for home,dirs,files in os.walk(data_path+pic_path): # 遍历全部图像文件
+        for filename in files:
+            pic_name.append(os.path.join(home,filename)) # 保存全部图像文件名
+    # print(os.listdir(data_path+pic_path))
+    # print(data_path+pic_path)
+    for i in range(len(pic_name)):
+        percentBar(len(pic_name)) # 显示当前百分比进度条
+        # print(f'读取中---第{i}个图像',pic_name[i])
+        one_dict = {'id':pic_name[i],'text':''} # 单张图像识别结果的字典
+        ocr = CnOcr(rec_model_name='ch_PP-OCRv3') # 竖排汉字识别
+        out = ocr.ocr(pic_name[i])
+        right_pos = [] # 识别框从右到左排序列表
+        for i in range(len(out)):
+            right_pos.append(out[i]['position'][0][0]) # OpenCV坐标原点在左上角
+        # sorted_id = sorted(range(len(right_pos)),key=lambda k: right_pos[k],reverse=True) # 因此从右到左是x从大到小顺序
+        # sorted_id = np.argsort(right_pos).tolist() # numpy排序后转list
+        sorted_pos = np.sort(right_pos).tolist() # numpy排序后转list
+        sorted_pos.reverse() # sort从小到大需要反向
+        for i in range(len(out)):
+            one_dict['text'] += fan2jian(fan=out[right_pos.index(sorted_pos[i])]['text']) # 繁体转简体从右到左添加字典
+        # print(f'结果为---',one_dict)
+        all_dict.append(one_dict)
+    with open(json_path+json_name,'w') as result_json: # 字典列表写入json文件
+        json.dump(all_dict,result_json,indent=4,ensure_ascii=False)
 
